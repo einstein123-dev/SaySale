@@ -282,6 +282,9 @@ def test_voided_sales_do_not_drive_restock_velocity(env):
     analytics = store.get_shop_analytics(token, shop)
     oil_runway = next(row for row in analytics['inventory_runway'] if row['name'] == 'Cooking oil')
 
+    assert analytics['sales_total_minor'] == 0
+    assert analytics['sales_count'] == 0
+    assert all(product['name'] != 'Cooking oil' for product in analytics['top_products'])
     assert oil_runway['daily_velocity'] == 0
     assert oil_runway['days_left'] is None
     assert all(item['name'] != 'Cooking oil' for item in analytics['restock_recommendations'])
@@ -457,4 +460,3 @@ def test_void_permission_denied_for_clerk_and_viewer(env):
     # Clerk does not have void permission
     with pytest.raises(PermissionError, match='do not have permission'):
         store.void_transaction(clerk_token, shop, 'tx-perm-test', reason='Clerk attempting void')
-

@@ -678,7 +678,18 @@ def get_shop_analytics(token,shop_id,days=30,path=None):
         _access(c,token,shop_id,'read')
         shop=dict(c.execute('SELECT * FROM shops WHERE id=?',(shop_id,)).fetchone())
         products=[dict(r) for r in c.execute('SELECT * FROM products WHERE shop_id=? ORDER BY name',(shop_id,))]
-        tx_rows=[dict(r) for r in c.execute('SELECT * FROM transactions WHERE shop_id=? ORDER BY created_at DESC',(shop_id,))]
+        tx_rows=[dict(r) for r in c.execute('''
+            SELECT tx.* FROM transactions tx
+            WHERE tx.shop_id=?
+              AND NOT EXISTS (
+                SELECT 1 FROM transactions reversal
+                WHERE reversal.shop_id=tx.shop_id
+                  AND reversal.type='void'
+                  AND substr(reversal.note,1,length('Void of ' || tx.id))='Void of ' || tx.id
+                  AND substr(reversal.note,length('Void of ' || tx.id)+1,1)=' '
+              )
+            ORDER BY tx.created_at DESC
+        ''',(shop_id,))]
         recent_sales=c.execute('''SELECT sale.item_name,sale.quantity FROM transactions sale
                                   WHERE sale.shop_id=? AND sale.type='sale'
                                     AND julianday(sale.created_at)>=julianday('now',?)
@@ -912,4 +923,3 @@ def void_transaction(token, shop_id, transaction_id, reason, path=None):
             'reason': reason
         })
         return {'snapshot_id': snap_id, 'void_tx_id': void_tx_id}
-
