@@ -1,0 +1,98 @@
+import json
+import sys
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from types import SimpleNamespace
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+import pytest
+import db
+from ai_parser import parse_transaction, Draft
+from ui import csv_bytes, ledger_frame
+
+@pytest.fixture
+def shop(tmp_path):
+    p=tmp_path/'regression.sqlite3'
+    db.init_db(p)
+    db.reset_demo(p)
+    return p
+
+def product(p):
+    return next(r['id'] for r in db.products(p) if r['name']=='Bottles of oil')
+
+def test_concurrent_oversell(shop):
+    def sale(token):
+        try:
+            return db.save_transaction(token,'sale',product(shop),6,25,path=shop)
+        except ValueError:
+            return False
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes=list(pool.map(sale,['first','second']))
+    assert sum(outcomes)==1
+    assert len(db.ledger(shop))==1
+    assert next(p for p in db.products(shop) if p['id']==product(shop))['quantity_on_hand']==4
+
+def test_concurrent_duplicate(shop):
+    def sale(_):
+        return db.save_transaction('same','sale',product(shop),2,25,path=shop)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        outcomes=list(pool.map(sale,range(4)))
+    assert sum(outcomes)==1
+    assert len(db.ledger(shop))==1
+
+def test_reset_rejects_stale_draft(shop):
+    gen=db.generation(shop)
+    db.reset_demo(shop)
+    with pytest.raises(ValueError,match='reset'):
+        db.save_transaction('old','sale',product(shop),1,25,path=shop,expected_generation=gen)
+    assert not db.ledger(shop)
+
+def test_total_overflow_no_write(shop):
+    with pytest.raises(ValueError,match='total exceeds'):
+        db.save_transaction('large','restock',product(shop),100000000,100000000,path=shop)
+    assert not db.ledger(shop)
+
+def test_stock_upper_bound(shop):
+    with pytest.raises(ValueError,match='Stock cannot exceed'):
+        db.save_transaction('large','restock',product(shop),100000000,0,path=shop)
+
+def test_threshold_unknown_product(shop):
+    with pytest.raises(ValueError,match='no longer exists'):
+        db.set_threshold(9999,3,shop)
+
+def test_duplicate_casefold_product(shop):
+    import sqlite3
+    with pytest.raises(sqlite3.IntegrityError):
+        db.add_product('bottles of oil',0,1,shop)
+
+def test_unknown_cost_export_and_formula_guard(shop):
+    db.save_transaction('r','restock',product(shop),2,None,note='=HYPERLINK("bad")',path=shop)
+    frame=ledger_frame(db.ledger(shop))
+    assert frame.iloc[0]['Amount (GHS)'] is None
+    assert "'=HYPERLINK" in csv_bytes(frame).decode('utf-8-sig')
+
+def test_api_mocked_success_and_missing_fields(monkeypatch):
+    # Local contract test ONLY. Does not measure live Gemini accuracy.
+    import google.genai
+    payload=dict(type='sale',item_name='oil',quantity=None,unit_price=None,amount_for_expense=None,currency='GHS',missing_fields=[],clarification_question=None)
+    class Client:
+        def __init__(self,**kwargs): self.models=self
+        def __enter__(self): return self
+        def __exit__(self,*args): pass
+        def generate_content(self,**kwargs): return SimpleNamespace(text=json.dumps(payload))
+    monkeypatch.setattr(google.genai,'Client',Client)
+    actual=parse_transaction('I sold oil','test-only','test-model')
+    assert {'quantity','unit_price'} <= set(actual['missing_fields'])
+
+@pytest.mark.parametrize('payload',['not json','{}','{"type":"refund"}'])
+def test_invalid_ai_payload(payload):
+    with pytest.raises(ValueError): Draft.model_validate_json(payload)
+
+def test_empty_input_no_api_call():
+    with pytest.raises(ValueError): parse_transaction('','test-only','test-model')
+
+def test_missing_config():
+    with pytest.raises(ValueError): parse_transaction('sale','','')
+
+def test_nonfinite_draft_rejected():
+    values=dict(type='sale',item_name='oil',quantity=1,unit_price=float('inf'),amount_for_expense=None,currency='GHS',missing_fields=[],clarification_question=None)
+    with pytest.raises(ValueError): Draft.model_validate(values)

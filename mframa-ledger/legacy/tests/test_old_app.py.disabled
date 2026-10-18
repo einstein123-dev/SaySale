@@ -1,0 +1,122 @@
+from pathlib import Path
+from streamlit.testing.v1 import AppTest
+import db
+
+def test_manual_ui(tmp_path, monkeypatch):
+    monkeypatch.setattr(db, 'DB_PATH', tmp_path/'ui.sqlite3')
+    db.init_db()
+    db.reset_demo()
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py')).run()
+    assert not app.exception
+    next(b for b in app.button if b.label=='Create manual draft').click().run()
+    next(s for s in app.selectbox if s.label=='Transaction type').select('sale')
+    next(s for s in app.selectbox if s.label.startswith('Inventory product')).select('Bottles of oil')
+    next(i for i in app.text_input if i.label.startswith('Quantity')).set_value('6')
+    next(i for i in app.text_input if i.label.startswith('Unit price')).set_value('25')
+    next(s for s in app.selectbox if s.label=='Confirm currency').select('GHS')
+    next(c for c in app.checkbox if c.label.startswith('I reviewed')).check()
+    next(b for b in app.button if b.label=='Confirm & save').click().run()
+    assert not app.exception
+    assert len(db.ledger())==1
+    assert db.ledger()[0]['amount_pesewas']==15000
+
+
+def launch(tmp_path,monkeypatch):
+    monkeypatch.setattr(db,'DB_PATH',tmp_path/'journey.sqlite3')
+    db.init_db()
+    db.reset_demo()
+    return AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py')).run()
+
+
+def widget(app,group,label):
+    return next(w for w in getattr(app,group) if w.label.startswith(label))
+
+
+def draft(app,kind,qty='',price='',expense=''):
+    widget(app,'button','Create manual draft').click().run()
+    widget(app,'selectbox','Transaction type').select(kind)
+    widget(app,'selectbox','Inventory product').select('Bottles of oil')
+    widget(app,'text_input','Quantity').set_value(qty)
+    widget(app,'text_input','Unit price').set_value(price)
+    widget(app,'text_input','Expense amount').set_value(expense)
+    widget(app,'selectbox','Confirm currency').select('GHS')
+    widget(app,'checkbox','I reviewed').check()
+    return app
+
+
+def test_expense_and_unknown_restock_ui(tmp_path,monkeypatch):
+    app=launch(tmp_path,monkeypatch)
+    draft(app,'expense',expense='12.50')
+    widget(app,'button','Confirm & save').click().run()
+    assert not app.exception
+    assert db.ledger()[0]['amount_pesewas']==1250
+    draft(app,'restock',qty='3')
+    widget(app,'button','Check calculated').click().run()
+    assert any('cost unknown' in msg.value for msg in app.info)
+    assert len(db.ledger())==1
+    widget(app,'button','Confirm & save').click().run()
+    assert not app.exception
+    assert len(db.ledger())==2
+    assert next(p for p in db.products() if p['name']=='Bottles of oil')['quantity_on_hand']==13
+
+
+def test_invalid_and_unconfirmed_ui_no_write(tmp_path,monkeypatch):
+    app=launch(tmp_path,monkeypatch)
+    draft(app,'sale',qty='100',price='25')
+    widget(app,'button','Confirm & save').click().run()
+    assert any('Insufficient stock' in msg.value for msg in app.error)
+    assert not db.ledger()
+    widget(app,'text_input','Quantity').set_value('1')
+    widget(app,'checkbox','I reviewed').uncheck()
+    widget(app,'button','Confirm & save').click().run()
+    assert not db.ledger()
+    assert not app.exception
+
+
+def test_navigation_and_inventory_creation(tmp_path,monkeypatch):
+    app=launch(tmp_path,monkeypatch)
+    widget(app,'radio','Workspace').set_value('Inventory').run()
+    widget(app,'text_input','Product name').set_value('Tins of milk')
+    widget(app,'number_input','Opening quantity').set_value(10)
+    widget(app,'button','Add product').click().run()
+    assert not app.exception
+    assert any(p['name']=='Tins of milk' for p in db.products())
+    for page in ['Ledger','About & setup','Record & overview']:
+        widget(app,'radio','Workspace').set_value(page).run()
+        assert not app.exception
+
+
+def test_ai_error_keeps_source_and_no_save(tmp_path,monkeypatch):
+    import ai_parser
+    def unavailable(*args):
+        raise TimeoutError('simulated network failure')
+    monkeypatch.setattr(ai_parser,'parse_transaction',unavailable)
+    monkeypatch.setenv('GEMINI_API_KEY','test-only')
+    monkeypatch.setenv('GEMINI_MODEL','test-only')
+    app=launch(tmp_path,monkeypatch)
+    widget(app,'text_area','What happened?').set_value('I sold oil')
+    widget(app,'checkbox','This is synthetic').check().run()
+    widget(app,'button','Parse with AI').click().run()
+    assert not app.exception
+    assert not db.ledger()
+    assert widget(app,'text_area','What happened?').value=='I sold oil'
+    assert any('Nothing was saved' in msg.value for msg in app.error)
+
+
+def test_ai_mocked_draft_requires_confirmation(tmp_path,monkeypatch):
+    import ai_parser
+    monkeypatch.setenv('GEMINI_API_KEY','test-only')
+    monkeypatch.setenv('GEMINI_MODEL','test-only')
+    monkeypatch.setattr(ai_parser,'parse_transaction',lambda *args:dict(type='sale',item_name='Bottles of oil',quantity=6,unit_price=25,currency='GHS',amount_for_expense=None,missing_fields=[],clarification_question=None))
+    app=launch(tmp_path,monkeypatch)
+    widget(app,'text_area','What happened?').set_value('Sold 6 oil at 25 cedis')
+    widget(app,'checkbox','This is synthetic').check().run()
+    widget(app,'button','Parse with AI').click().run()
+    assert not app.exception
+    assert not db.ledger()
+    assert widget(app,'text_input','Quantity').value=='6'
+    widget(app,'selectbox','Inventory product').select('Bottles of oil')
+    widget(app,'checkbox','I reviewed').check()
+    widget(app,'button','Confirm & save').click().run()
+    assert not app.exception
+    assert len(db.ledger())==1

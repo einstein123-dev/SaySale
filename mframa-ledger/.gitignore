@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+*.sqlite3
+*.sqlite3-*
+*.csv
+evaluation-results.json
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json

@@ -1,0 +1,17 @@
+[
+ {"text":"I sold 6 bottles of oil at 25 cedis each.","split":"development","expected":{"type":"sale","quantity":6,"unit_price":25,"currency":"GHS"}},
+ {"text":"Sold two bars of soap at GH₵8 each.","split":"development","expected":{"type":"sale","quantity":2,"unit_price":8,"currency":"GHS"}},
+ {"text":"Paid 15 cedis for transport.","split":"development","expected":{"type":"expense","amount_for_expense":15,"currency":"GHS"}},
+ {"text":"Restocked ten bags of rice at 90 GHS per bag.","split":"development","expected":{"type":"restock","quantity":10,"unit_price":90,"currency":"GHS"}},
+ {"text":"I sold oil.","split":"development","expected":{"type":"sale","quantity":null,"unit_price":null}},
+ {"text":"Sold 3 bars of soap for 24 cedis total.","split":"development","expected":{"type":"sale","quantity":3,"unit_price":null}},
+ {"text":"Bought electricity credit for 50 GHS.","split":"development","expected":{"type":"expense","amount_for_expense":50,"currency":"GHS"}},
+ {"text":"Restocked 5 bottles of oil.","split":"development","expected":{"type":"restock","quantity":5,"unit_price":null}},
+ {"text":"Sold 4 bags of rice at 100 GHS each.","split":"development","expected":{"type":"sale","quantity":4,"unit_price":100}},
+ {"text":"Sold 1 bar of soap at 7.50 cedis.","split":"development","expected":{"type":"sale","quantity":1,"unit_price":7.5}},
+ {"text":"I paid 22 cedis for cleaning.","split":"held-out","expected":{"type":"expense","amount_for_expense":22,"currency":"GHS"}},
+ {"text":"Sold seven bottles of oil at thirty cedis each.","split":"held-out","expected":{"type":"sale","quantity":7,"unit_price":30,"currency":"GHS"}},
+ {"text":"I sold 2 bags of rice.","split":"held-out","expected":{"type":"sale","quantity":2,"unit_price":null}},
+ {"text":"Sold one soap for 2 dollars.","split":"held-out","expected":{"type":null}},
+ {"text":"Sold 2 soaps and paid 10 cedis for delivery.","split":"held-out","expected":{"type":null}}
+]

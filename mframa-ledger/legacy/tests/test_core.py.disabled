@@ -1,0 +1,51 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import pytest
+import db
+from ai_parser import Draft
+
+@pytest.fixture
+def shop(tmp_path):
+    p = tmp_path / 'test.sqlite3'
+    db.init_db(p)
+    db.reset_demo(p)
+    return p
+
+def oil(p):
+    return next(x['id'] for x in db.products(p) if x['name']=='Bottles of oil')
+
+def test_sale_persistence_duplicate(shop):
+    assert db.save_transaction('one','sale',oil(shop),6,25,path=shop)
+    assert not db.save_transaction('one','sale',oil(shop),6,25,path=shop)
+    assert db.ledger(shop)[0]['amount_pesewas']==15000
+    assert next(p for p in db.products(shop) if p['id']==oil(shop))['quantity_on_hand']==4
+    db.init_db(shop)
+    assert len(db.ledger(shop))==1
+
+def test_stock_rollback(shop):
+    with pytest.raises(ValueError):
+        db.save_transaction('bad','sale',oil(shop),11,25,path=shop)
+    assert not db.ledger(shop)
+    assert next(p for p in db.products(shop) if p['id']==oil(shop))['quantity_on_hand']==10
+
+def test_expense_restock_separation(shop):
+    db.save_transaction('a','expense',expense_amount='12.50',path=shop)
+    db.save_transaction('b','restock',oil(shop),3,10,path=shop)
+    assert sum(r['amount_pesewas'] for r in db.ledger(shop) if r['type']=='expense')==1250
+    assert next(p for p in db.products(shop) if p['id']==oil(shop))['quantity_on_hand']==13
+
+@pytest.mark.parametrize('value',['NaN','Infinity','-1','0.001',None])
+def test_bad_money(value):
+    with pytest.raises(ValueError): db.money(value)
+
+@pytest.mark.parametrize('q',[0,-1,1.5,'NaN'])
+def test_bad_quantity(shop,q):
+    with pytest.raises(ValueError): db.save_transaction('bad','sale',oil(shop),q,1,path=shop)
+
+def test_schema_rejects_bad_output():
+    with pytest.raises(ValueError): Draft.model_validate_json('{"type":"transfer"}')
+
+def test_unknown_cost(shop):
+    db.save_transaction('a','restock',oil(shop),2,None,path=shop)
+    assert db.ledger(shop)[0]['unit_price_pesewas'] is None

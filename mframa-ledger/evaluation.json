@@ -1,0 +1,188 @@
+[
+  {
+    "text": "Sold 6 cooking oils at 25 USD each.",
+    "currency": "USD",
+    "split": "development",
+    "expected": {
+      "type": "sale",
+      "quantity": 6,
+      "unit_price": 25,
+      "currency": "USD"
+    }
+  },
+  {
+    "text": "Paid 15 dollars for delivery.",
+    "currency": "USD",
+    "split": "development",
+    "expected": {
+      "type": "expense",
+      "amount_for_expense": 15,
+      "currency": "USD"
+    }
+  },
+  {
+    "text": "Vendu deux savons à 8 euros chacun.",
+    "currency": "EUR",
+    "split": "development",
+    "expected": {
+      "type": "sale",
+      "quantity": 2,
+      "unit_price": 8,
+      "currency": "EUR"
+    }
+  },
+  {
+    "text": "Pagué 12,50 euros de transporte.",
+    "currency": "EUR",
+    "split": "development",
+    "expected": {
+      "type": "expense",
+      "amount_for_expense": 12.5,
+      "currency": "EUR"
+    }
+  },
+  {
+    "text": "Restocked 10 bags of rice at JPY 900 each.",
+    "currency": "JPY",
+    "split": "development",
+    "expected": {
+      "type": "restock",
+      "quantity": 10,
+      "unit_price": 900,
+      "currency": "JPY"
+    }
+  },
+  {
+    "text": "Sold 3 soaps for USD 24 total.",
+    "currency": "USD",
+    "split": "development",
+    "expected": {
+      "type": "sale",
+      "quantity": 3,
+      "unit_price": null
+    }
+  },
+  {
+    "text": "I sold cooking oil.",
+    "currency": "GBP",
+    "split": "development",
+    "expected": {
+      "type": "sale",
+      "quantity": null,
+      "unit_price": null
+    }
+  },
+  {
+    "text": "Sold one soap at KWD 1.250.",
+    "currency": "KWD",
+    "split": "development",
+    "expected": {
+      "type": "sale",
+      "quantity": 1,
+      "unit_price": 1.25,
+      "currency": "KWD"
+    }
+  },
+  {
+    "text": "Restocked 5 cooking oils.",
+    "currency": "GHS",
+    "split": "development",
+    "expected": {
+      "type": "restock",
+      "quantity": 5,
+      "unit_price": null,
+      "currency": "GHS"
+    }
+  },
+  {
+    "text": "Sold 2 rice bags at 100 each.",
+    "currency": "INR",
+    "split": "development",
+    "expected": {
+      "type": "sale",
+      "quantity": 2,
+      "unit_price": 100,
+      "currency": "INR"
+    }
+  },
+  {
+    "text": "Vendí siete jabones a 2 euros cada uno.",
+    "currency": "EUR",
+    "split": "held-out",
+    "expected": {
+      "type": "sale",
+      "quantity": 7,
+      "unit_price": 2,
+      "currency": "EUR"
+    }
+  },
+  {
+    "text": "Paid 22 CAD for cleaning.",
+    "currency": "CAD",
+    "split": "held-out",
+    "expected": {
+      "type": "expense",
+      "amount_for_expense": 22,
+      "currency": "CAD"
+    }
+  },
+  {
+    "text": "Sold 1 soap for 2 USD.",
+    "currency": "EUR",
+    "split": "held-out",
+    "expected": {
+      "type": "sale",
+      "quantity": 1,
+      "unit_price": 2,
+      "currency": "USD"
+    }
+  },
+  {
+    "text": "I returned two soaps.",
+    "currency": "USD",
+    "split": "held-out",
+    "expected": {
+      "type": null
+    }
+  },
+  {
+    "text": "Sold 2 soaps and paid 10 USD for delivery.",
+    "currency": "USD",
+    "split": "held-out",
+    "expected": {
+      "type": null
+    }
+  },
+  {
+    "text": "Vendu trois huiles à 15,75 euros chacune.",
+    "currency": "EUR",
+    "split": "held-out",
+    "expected": {
+      "type": "sale",
+      "quantity": 3,
+      "unit_price": 15.75,
+      "currency": "EUR"
+    }
+  },
+  {
+    "text": "Paid 3.500 BHD for transport.",
+    "currency": "BHD",
+    "split": "held-out",
+    "expected": {
+      "type": "expense",
+      "amount_for_expense": 3.5,
+      "currency": "BHD"
+    }
+  },
+  {
+    "text": "Vendí una bolsa de arroz.",
+    "currency": "MXN",
+    "split": "held-out",
+    "expected": {
+      "type": "sale",
+      "quantity": 1,
+      "unit_price": null,
+      "currency": "MXN"
+    }
+  }
+]
