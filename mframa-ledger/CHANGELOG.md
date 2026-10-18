@@ -28,7 +28,7 @@
 - Added Void / Reverse Transaction and Ledger Snapshots History expanders to the Streamlit Ledger page.
 
 ## Automated SMTP Email Delivery & Invitations
-- Created [`email_service.py`](file:///C:/Users/User/Downloads/mframa-global/mframa-ledger/email_service.py) supporting standard SMTP over SSL (`port 465`) and STARTTLS (`port 587`).
+- Created [`email_service.py`](email_service.py) supporting standard SMTP over SSL (`port 465`) and STARTTLS (`port 587`).
 - Added automated HTML & plain-text invitation emails sent upon team member invite creation.
 - Configurable via environment variables or `.streamlit/secrets.toml` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`).
 - Added in-app SMTP configuration status check and live test email dispatcher under **Settings**.
@@ -88,7 +88,7 @@ No live Gemini call was made. Configure your own key/model, verify free-tier ter
 - 18-prompt multilingual/multi-currency optional live evaluation set; not yet run against Gemini.
 
 ## Identity and tenant isolation
-- Separate `mframa-global.sqlite3` schema for users, sessions, shops, memberships, invitations and tenant-owned records.
+- Separate `saysale-global.sqlite3` schema for users, sessions, shops, memberships, invitations and tenant-owned records.
 - Salted scrypt passwords; opaque hashed session tokens, 8-hour expiry, logout/password-change revocation and persistent login lockout.
 - Owner, manager, clerk and viewer checks at the database service layer, not only UI controls.
 - Cross-shop product IDs rejected, shop-bound reads/exports, immediate membership revocation and generation-bound drafts.

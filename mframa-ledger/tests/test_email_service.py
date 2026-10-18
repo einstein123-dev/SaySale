@@ -58,7 +58,7 @@ def test_send_invitation_email_mocked(monkeypatch):
         'port': 2525,
         'username': 'user',
         'password': 'pass',
-        'sender': 'noreply@mframa.global',
+        'sender': 'noreply@saysale.example',
         'sender_name': 'SaySale',
         'use_tls': True,
         'use_ssl': False,

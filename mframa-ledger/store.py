@@ -14,7 +14,7 @@ from decimal import Decimal, InvalidOperation
 from auth import email_key, password_hash, password_matches, token_hash
 from intl import CURRENCIES, COUNTRIES, TIMEZONES, minor_units
 
-DB_PATH=Path(os.environ.get('MFRAMA_DB_PATH',str(Path(__file__).parent/'mframa-global.sqlite3')))
+DB_PATH=Path(os.environ.get('SAYSALE_DB_PATH',str(Path(__file__).parent/'saysale-global.sqlite3')))
 RESTOCK_COVERAGE_DAYS=14
 ROLES=('owner','manager','clerk','viewer')
 PERMISSIONS={

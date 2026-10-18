@@ -102,16 +102,16 @@ There is no public reset link. A trusted operator with direct filesystem access 
 python admin.py reset-password person@example.com
 ```
 
-It prompts using `getpass`, updates the password hash and revokes all account sessions. Verify the requester’s identity separately before doing this. Never expose this command through a web endpoint. Back up the database first. The command uses the same `MFRAMA_DB_PATH` setting as the app.
+It prompts using `getpass`, updates the password hash and revokes all account sessions. Verify the requester’s identity separately before doing this. Never expose this command through a web endpoint. Back up the database first. The command uses the same `SAYSALE_DB_PATH` setting as the app.
 
 ## 5. Data storage, upgrades and backups
 
-The new database is `mframa-global.sqlite3` next to the code. To select a durable path, set an environment variable **before launching the process**:
+The new database is `saysale-global.sqlite3` next to the code. To select a durable path, set an environment variable **before launching the process**:
 
 ```bash
-export MFRAMA_DB_PATH='/absolute/path/to/persistent/mframa-global.sqlite3'
+export SAYSALE_DB_PATH='/absolute/path/to/persistent/saysale-global.sqlite3'
 # PowerShell:
-# $env:MFRAMA_DB_PATH='C:\persistent\mframa-global.sqlite3'
+# $env:SAYSALE_DB_PATH='C:\persistent\saysale-global.sqlite3'
 ```
 
 Create and protect the parent directory first. This environment variable is read at module startup, not dynamically from Streamlit secrets. Restart after changing it. Do not put the DB in a web-served/static directory. All users, shops, sessions, invitations and ledger records live in this one file.
@@ -152,7 +152,7 @@ The generic webhook adapter accepts text events from a POS, messaging bridge or 
 2. Launch the webhook API separately from Streamlit, using the same database path and Gemini environment variables. Run one worker only:
 
 ```powershell
-$env:MFRAMA_DB_PATH = 'C:\persistent\mframa-global.sqlite3'
+$env:SAYSALE_DB_PATH = 'C:\persistent\saysale-global.sqlite3'
 $env:GEMINI_API_KEY = 'YOUR_REAL_KEY'
 $env:GEMINI_MODEL = 'EXACT_CONFIGURED_MODEL_ID'
 python -m uvicorn webhook_api:app --host 127.0.0.1 --port 8000 --workers 1

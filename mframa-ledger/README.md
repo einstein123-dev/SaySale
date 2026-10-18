@@ -337,6 +337,10 @@ Every listed member should have made a meaningful contribution.
 
 ## License
 
-**Add the project license here before public submission.** Confirm that the
-license is compatible with all third-party code, assets, APIs, and datasets
-included in the repository.
+SaySale is licensed under the [Apache License 2.0](../LICENSE).
+
+The Apache License 2.0 permits use, reproduction, modification, and
+distribution subject to its terms and required notices. Review the licenses
+and terms of third-party dependencies, APIs, icons, screenshots, datasets, and
+other assets separately; this project license does not relicense those
+components.
