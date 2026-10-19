@@ -28,7 +28,6 @@ st.session_state.setdefault('dark_mode',False)
 st.markdown(STYLE + (DARK_STYLE if st.session_state.dark_mode else ''),unsafe_allow_html=True)
 particle_background()
 store.init_db()
-cookie_controller=CookieController(key='saysale_cookies')
 AUTH_COOKIE='saysale_auth'
 
 
@@ -41,8 +40,13 @@ def reset_login():
     # Remove shop data, drafts and password widget state at logout/session expiry.
     lang=st.session_state.get('language','en')
     dark_mode=st.session_state.get('dark_mode',False)
-    if cookie_controller.get(AUTH_COOKIE) is not None:
-        cookie_controller.remove(AUTH_COOKIE)
+    if st.context.cookies.get(AUTH_COOKIE) is not None:
+        cookie_controller=CookieController(key='saysale_cookies')
+        try:
+            cookie_controller.remove(AUTH_COOKIE)
+        except KeyError:
+            # The component may not have hydrated its cookie cache yet.
+            pass
     st.session_state.clear()
     st.session_state.language=lang
     st.session_state.dark_mode=dark_mode
@@ -51,7 +55,7 @@ def reset_login():
 # Streamlit session state is cleared by a full browser refresh. Restore the
 # server-validated session token from its short-lived browser cookie.
 if 'auth_token' not in st.session_state:
-    saved_token=cookie_controller.get(AUTH_COOKIE)
+    saved_token=st.context.cookies.get(AUTH_COOKIE)
     if isinstance(saved_token,str) and saved_token:
         st.session_state.auth_token=saved_token
 
@@ -129,6 +133,7 @@ if 'auth_token' not in st.session_state:
                     token=store.login(email,password)
                     reset_login()
                     st.session_state.auth_token=token
+                    cookie_controller=CookieController(key='saysale_cookies')
                     cookie_controller.set(
                         AUTH_COOKIE,
                         token,
@@ -672,6 +677,8 @@ if shop and page=='Team':
                         try:
                             code=store.create_invite(TOKEN,shop_id,email,invite_role)
                             st.session_state.invite_code=code
+                            for result_key in ('invite_email_sent','invite_email_failed','invite_email_unconfigured'):
+                                st.session_state.pop(result_key,None)
                             smtp_cfg = email_service.get_smtp_config()
                             if smtp_cfg['configured']:
                                 try:
@@ -685,12 +692,22 @@ if shop and page=='Team':
                                     )
                                     if sent:
                                         st.session_state.invite_email_sent = email
+                                    else:
+                                        st.session_state.invite_email_failed = True
                                 except Exception as smtp_err:
                                     logging.getLogger(__name__).warning("SMTP invite send failed: %s", smtp_err)
+                                    st.session_state.invite_email_failed = f"{type(smtp_err).__name__}: {str(smtp_err)[:240]}"
+                            else:
+                                st.session_state.invite_email_unconfigured = True
                         except (ValueError,PermissionError,sqlite3.Error) as e: error(e)
                 if 'invite_code' in st.session_state:
                     if st.session_state.pop('invite_email_sent', None):
                         st.success(f"📧 {t('Invitation email sent via SMTP to')} {email}!")
+                    elif (smtp_failure := st.session_state.pop('invite_email_failed', None)):
+                        st.warning(t('Email delivery failed. The invitation is still active; copy the code below and share it manually. Check the SMTP settings or provider credentials.'))
+                        st.caption(f"SMTP response: {smtp_failure}")
+                    elif st.session_state.pop('invite_email_unconfigured', None):
+                        st.info(t('SMTP is not configured. The invitation is active; copy the code below and share it manually.'))
                     st.info(t('Copy this one-time code and share it securely with the named person. It expires in 48 hours.'))
                     st.code(st.session_state.invite_code,language=None)
                     if st.button(t('Close')):
