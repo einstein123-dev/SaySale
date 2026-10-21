@@ -57,7 +57,7 @@ Supported types: sale, expense, restock. Use null for unknown values. Do not inv
 quantity, price, type or currency. Cedis, GH₵ and GHS mean GHS. Numbers written in
 words are allowed. Prices must be per unit for sales and restocks: if only a total is given for a sale, leave unit_price
 null and request clarification. Only amount_for_expense is a total expense amount.
-Return any explicit currency as its ISO 4217 code.
+\Return any explicit currency as its ISO 4217 code.
 If currency is not stated, use the shop currency supplied by the application.
 Never convert currencies or guess an exchange rate. If a currency symbol is ambiguous,
 use the shop currency only if consistent; otherwise request clarification. Assign a confidence score between 0.0 and 1.0.
@@ -107,7 +107,9 @@ def parse_transaction(text, api_key, model, currency='GHS'):
         raise ValueError('Configure both GEMINI_API_KEY and GEMINI_MODEL, or use manual entry.')
     from google import genai
     from google.genai import types
-    with genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=20000)) as client:
+    # Cold starts and structured responses can exceed 20 seconds. Keep the
+    # request bounded, but allow enough time for a normal provider response.
+    with genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=60000)) as client:
         response = client.models.generate_content(
             model=model, contents=json.dumps({'shop_currency': currency, 'transaction_text': text}),
             config=types.GenerateContentConfig(system_instruction=PROMPT, temperature=0,

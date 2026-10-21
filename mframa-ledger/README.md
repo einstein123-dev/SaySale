@@ -31,6 +31,12 @@ advisor.
 - **Babel** for currency precision and localization
 - **Pytest** for automated testing
 
+## Team member contributions
+
+This is a solo project. The project author handled the planning, interface and
+backend implementation, database and authorization workflows, Gemini
+integration, webhook processing, testing, and documentation.
+
 ## Setup and installation
 
 ### Requirements

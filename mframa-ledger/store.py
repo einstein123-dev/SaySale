@@ -36,7 +36,6 @@ def connection(path=None):
         pass
     conn=sqlite3.connect(file_path,timeout=15,check_same_thread=False)
     conn.row_factory=sqlite3.Row
-    conn.execute('PRAGMA journal_mode=WAL')
     conn.execute('PRAGMA foreign_keys=ON')
     try:
         with conn:
@@ -47,6 +46,9 @@ def connection(path=None):
 
 def init_db(path=None):
     with connection(path) as c:
+        # WAL mode is persistent for a database file. Set it during schema
+        # initialization instead of on every short-lived query connection.
+        c.execute('PRAGMA journal_mode=WAL')
         c.executescript('''
         CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,
           name TEXT NOT NULL,password_hash TEXT NOT NULL,created_at REAL NOT NULL);
@@ -244,13 +246,15 @@ def create_shop(token,name,country,currency,timezone,path=None):
         return shop_id
 
 
-def snapshot(token,shop_id,path=None):
+def snapshot(token,shop_id,path=None,include_transactions=True):
     with connection(path) as c:
         c.execute('BEGIN')
         user,role=_access(c,token,shop_id)
         shop=dict(c.execute('SELECT * FROM shops WHERE id=?',(shop_id,)).fetchone())
         products=[dict(r) for r in c.execute('SELECT * FROM products WHERE shop_id=? ORDER BY name',(shop_id,))]
-        rows=[dict(r) for r in c.execute('SELECT * FROM transactions WHERE shop_id=? ORDER BY created_at DESC,rowid DESC',(shop_id,))]
+        rows=[]
+        if include_transactions:
+            rows=[dict(r) for r in c.execute('SELECT * FROM transactions WHERE shop_id=? ORDER BY created_at DESC,rowid DESC',(shop_id,))]
         pending_rows=c.execute("SELECT * FROM pending_drafts WHERE shop_id=? AND status='pending' ORDER BY created_at DESC",(shop_id,)).fetchall()
         pending=[]
         for pr in pending_rows:

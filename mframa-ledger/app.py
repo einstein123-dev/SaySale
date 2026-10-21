@@ -27,7 +27,15 @@ st.set_page_config(page_title='SaySale · Shop management',page_icon=str(LOGO_PA
 st.session_state.setdefault('dark_mode',False)
 st.markdown(STYLE + (DARK_STYLE if st.session_state.dark_mode else ''),unsafe_allow_html=True)
 particle_background()
-store.init_db()
+
+
+@st.cache_resource
+def initialize_database():
+    """Initialize schema and migrations once per Streamlit server process."""
+    store.init_db()
+
+
+initialize_database()
 AUTH_COOKIE='saysale_auth'
 
 
@@ -36,11 +44,11 @@ def clear_draft():
         st.session_state.pop(k,None)
 
 
-def reset_login():
+def reset_login(remove_cookie=True):
     # Remove shop data, drafts and password widget state at logout/session expiry.
     lang=st.session_state.get('language','en')
     dark_mode=st.session_state.get('dark_mode',False)
-    if st.context.cookies.get(AUTH_COOKIE) is not None:
+    if remove_cookie and st.context.cookies.get(AUTH_COOKIE) is not None:
         cookie_controller=CookieController(key='saysale_cookies')
         try:
             cookie_controller.remove(AUTH_COOKIE)
@@ -107,6 +115,35 @@ def error(e):
         st.error(t(str(e)))
 
 
+def ai_error_details(exc, source=''):
+    """Show a useful provider error without echoing the key or submitted text."""
+    message=getattr(exc,'message',None) or str(exc) or 'No error details returned.'
+    api_key=setting('GEMINI_API_KEY')
+    for secret in (api_key,source):
+        if secret:
+            message=message.replace(secret,'[redacted]')
+    status=getattr(exc,'code',None) or getattr(exc,'status_code',None)
+    status_text=f'HTTP {status}: ' if status else ''
+    return f'{type(exc).__name__}: {status_text}{message[:400]}'
+
+
+def financial_transactions(rows):
+    """Return non-void ledger entries for dashboard financial totals."""
+    voided_ids=set()
+    prefix='Void of '
+    reason_marker=' · Reason:'
+    for row in rows:
+        note=str(row.get('note') or '')
+        if row.get('type')=='void' and note.startswith(prefix) and reason_marker in note:
+            voided_ids.add(note[len(prefix):].split(reason_marker,1)[0])
+    return [
+        row for row in rows
+        if row.get('type') in ('sale','expense')
+        and row.get('id') not in voided_ids
+        and '(Voided:' not in str(row.get('note') or '')
+    ]
+
+
 def number(value):
     if not isinstance(value,str) or not value.strip():
         raise ValueError('Enter a monetary amount.')
@@ -123,43 +160,50 @@ def input_number(value):
 if 'auth_token' not in st.session_state:
     hero(t('Every shop. A clearer picture.'),t('Your words. Your currency. Your records.'),t('Describe a transaction, review the details, and keep sales and stock in step.'))
     show_flash()
-    login_tab,register_tab=st.tabs([t('Sign in'),t('Create account')])
-    with login_tab:
-        with st.form('login'):
-            email=st.text_input(t('Email'),max_chars=254)
-            password=st.text_input(t('Password'),type='password',max_chars=128)
-            if st.form_submit_button(t('Sign in'),type='primary'):
+    st.subheader('Choose a demo role')
+    st.caption('Select a role to explore the app with sample shop data.')
+
+    def demo_login(role):
+        """Create stable judge accounts and sign in under the selected role."""
+        password='SaySale-demo-access-2026'
+        emails={r:f'judge-{r}@demo.saysale.local' for r in ('owner','manager','clerk','viewer')}
+
+        def account(email, name):
+            try:
+                store.register(email,name,password)
+            except ValueError:
+                pass
+            return store.login(email,password)
+
+        owner_token=account(emails['owner'],'Demo owner')
+        owner_shops=store.list_shops(owner_token)
+        if owner_shops:
+            demo_shop=owner_shops[0]['id']
+        else:
+            demo_shop=store.create_shop(owner_token,'SaySale Demo Shop','FR','EUR','Europe/Paris')
+            store.reset_demo(owner_token,demo_shop)
+        if role!='owner':
+            role_token=account(emails[role],f'Demo {role}')
+            if not any(s['id']==demo_shop for s in store.list_shops(role_token)):
+                invite=store.create_invite(owner_token,demo_shop,emails[role],role)
+                store.accept_invite(role_token,invite)
+            return role_token
+        return owner_token
+
+    role_cols=st.columns(4)
+    for col, role in zip(role_cols,('owner','manager','clerk','viewer')):
+        with col:
+            if st.button(f'Sign in as {role.title()}',key=f'demo_signin_{role}',type='primary' if role=='owner' else 'secondary',use_container_width=True):
                 try:
-                    token=store.login(email,password)
-                    reset_login()
+                    token=demo_login(role)
                     st.session_state.auth_token=token
                     cookie_controller=CookieController(key='saysale_cookies')
-                    cookie_controller.set(
-                        AUTH_COOKIE,
-                        token,
-                        max_age=store.SESSION_SECONDS,
-                        secure=(st.context.url or '').startswith('https://'),
-                        same_site='strict'
-                    )
+                    cookie_controller.set(AUTH_COOKIE,token,max_age=store.SESSION_SECONDS,
+                        secure=(st.context.url or '').startswith('https://'),same_site='strict')
                     st.rerun()
-                except (ValueError,sqlite3.Error) as e: error(e)
-        st.caption(t('Your session lasts up to 8 hours. Refreshing should keep you signed in in this browser.'))
-    with register_tab:
-        with st.form('register'):
-            name=st.text_input(t('Name'),max_chars=80)
-            email=st.text_input(t('Email'),key='signup_email',max_chars=254)
-            password=st.text_input(t('Password'),type='password',key='signup_password',max_chars=128)
-            repeated=st.text_input(t('Repeat password'),type='password',max_chars=128)
-            st.caption(t('Use 12–128 characters. Email verification and email recovery are not configured.'))
-            if st.form_submit_button(t('Create account'),type='primary'):
-                try:
-                    if password!=repeated: raise ValueError(t('Passwords do not match.'))
-                    store.register(email,name,password)
-                    reset_login()
-                    flash('Account created. You can sign in now.')
-                except (ValueError,sqlite3.Error) as e: error(e)
+                except (ValueError,PermissionError,sqlite3.Error) as e:
+                    error(e)
     st.caption(t('Use synthetic data only. Never include customer details.'))
-    st.caption(t('Read the developer guide before public deployment.'))
     st.stop()
 
 TOKEN=st.session_state.auth_token
@@ -190,7 +234,14 @@ else:
 
 if shop_id:
     try:
-        state=store.snapshot(TOKEN,shop_id)
+        # Inventory, settings, team, and CFO views do not use the raw ledger
+        # rows. Avoid loading the complete transaction history on those reruns.
+        active_page=st.session_state.get('active_page','Record & overview')
+        state=store.snapshot(
+            TOKEN,
+            shop_id,
+            include_transactions=active_page in ('Record & overview','Ledger'),
+        )
     except PermissionError as e:
         clear_draft()
         error(e)
@@ -255,9 +306,6 @@ with st.sidebar:
             finally:
                 reset_login()
             st.rerun()
-    ready=bool(setting('GEMINI_API_KEY') and setting('GEMINI_MODEL'))
-    st.caption(t('AI configured · connection unverified' if ready else 'Manual mode'))
-
 show_flash()
 
 
@@ -386,8 +434,9 @@ if shop and page=='Record & overview':
                 new_draft(result)
                 st.session_state.latency=time.perf_counter()-start
             except Exception as e:
-                logging.getLogger(__name__).warning('Extraction failed: %s (%s)', type(e).__name__, e)
+                logging.getLogger(__name__).warning('Extraction failed: %s', type(e).__name__)
                 st.error(t('AI is unavailable. Nothing was saved. Retry or enter manually.'))
+                st.caption(ai_error_details(e,source))
         if input_mode=='Text' and y.button(t('Create manual draft'),key='manual_draft_button',type='secondary',width='stretch'): new_draft()
         if not ready: st.caption(t('AI is not configured. Manual entry is available.'))
         if input_mode=='Voice':
@@ -472,10 +521,11 @@ if shop and page=='Record & overview':
     else:
         st.info(t('Your role allows read-only access.'))
         clear_draft()
+    financial_rows=financial_transactions(rows)
     shop_summary(
-        fmt(sum(r['amount_minor'] for r in rows if r['type']=='sale')),
-        fmt(sum(r['amount_minor'] for r in rows if r['type']=='expense')),
-        sum(r['type']=='sale' for r in rows),
+        fmt(sum(r['amount_minor'] or 0 for r in financial_rows if r['type']=='sale')),
+        fmt(sum(r['amount_minor'] or 0 for r in financial_rows if r['type']=='expense')),
+        sum(r['type']=='sale' for r in financial_rows),
         format_decimal(sum(p['quantity'] for p in items),locale=language),
         language,
     )
